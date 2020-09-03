@@ -14,11 +14,11 @@ def forest_test(df):
     Y = df.iloc[:, -1]
     X = X.fillna(0)
     x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.30, random_state=51)
-    trained_forest = RandomForestClassifier(n_estimators=1000).fit(x_train, y_train)
+    trained_forest = RandomForestClassifier(n_estimators=1000, n_jobs=-1).fit(x_train, y_train)
     prediction_forest = trained_forest.predict(x_test)
     print(confusion_matrix(y_test, prediction_forest))
     print(classification_report(y_test, prediction_forest))
-    return prediction_forest
+    return prediction_forest, trained_forest
 
 
 def read_data_from_directory(wafer_class, machine_step):
@@ -29,7 +29,7 @@ def read_data_from_directory(wafer_class, machine_step):
     cnt = 0
     for file in dir_content:
         filepath = "../Wafer_Data/" + wafer_class + "/" + machine_step + "/" + file
-        #         print("Reading File {0}".format(file))
+        print("Reading File {0}".format(file))
         df = df.append(pd.read_csv(filepath))
 
     df = df.groupby(['WaferID', "STEP ID"]).describe(percentiles=[])
@@ -45,16 +45,16 @@ def remove_columns(df):
     # Removing "COUNT" Column
     col_index = len(df.columns) - 1 - 6
     while col_index >= 0:
-        #         print('Removing Column Number: ', col_index)
+        print('Removing Column Number: ', col_index)
         df.drop(df.columns[col_index], axis=1, inplace=True)
         col_index = col_index - 6
 
     # Removing 50% Columns
     col_index = len(df.columns) - 1 - 2
     while col_index >= 0:
-        #         print('Removing Columns Number: ', col_index)
+        print('Removing Columns Number: ', col_index)
         df.drop(df.columns[col_index], axis=1, inplace=True)
-        # print(df.columns[col_index])
+        print(df.columns[col_index])
         col_index = col_index - 5
 
     return df
@@ -105,7 +105,7 @@ def run_z1(threshold):
     # Remove Unnecessary Columns
     df = remove_columns(df)
 
-    # Configuring the Heatmap to make it easier to see 
+    # Configuring the Heatmap to make it easier to see
     print_heatmap(df.corr())
 
     # Dividing into Inputs and Outputs and run Random Forest Classification
@@ -126,7 +126,7 @@ def run_z2(threshold):
     # Remove Unnecessary Columns
     df = remove_columns(df)
 
-    # Configuring the Heatmap to make it easier to see 
+    # Configuring the Heatmap to make it easier to see
     print_heatmap(df.corr())
 
     # Dividing into Inputs and Outputs and run Random Forest Classification
@@ -147,7 +147,7 @@ def run_z3(threshold):
     # Remove Unnecessary Columns
     df = remove_columns(df)
 
-    # Configuring the Heatmap to make it easier to see 
+    # Configuring the Heatmap to make it easier to see
     print_heatmap(df.corr())
 
     # Dividing into Inputs and Outputs and run Random Forest Classification
@@ -156,9 +156,44 @@ def run_z3(threshold):
     df = pd.DataFrame(result_list, columns=['Type', 'Count'])
     print(df.groupby('Type').max())
 
+# 
+# if __name__ == "__main__":
+#     threshold = int(input("Enter the threshold: "))
+#     run_z1(threshold)
+#     run_z2(threshold)
+#     run_z3(threshold)
 
-if __name__ == "__main__":
-    threshold = int(input("Enter the threshold: "))
-    run_z1(threshold)
-    run_z2(threshold)
-    run_z3(threshold)
+threshold = int(input("Enter the threshold: "))
+# run_z1(threshold)
+# run_z2(threshold)
+# run_z3(threshold)
+
+# reading all Z1 Data
+good_z1_df = read_data_from_directory("good_wafer", "Z1_100")
+bad_z1_df = read_data_from_directory("bad_wafer", "Z1_100")
+
+# Creating combined dataset of both good and bad
+df = pd.DataFrame(good_z1_df.append(bad_z1_df), columns=good_z1_df.columns)
+
+# Remove Unnecessary Columns
+df = remove_columns(df)
+
+# Configuring the Heatmap to make it easier to see
+print_heatmap(df.corr())
+
+# Dividing into Inputs and Outputs and run Random Forest Classification
+result, classifier = forest_test(df)
+result_list = find_threshold(result, threshold)
+df_temp = pd.DataFrame(result_list, columns=['Type', 'Count'])
+print(df_temp.groupby('Type').max())
+
+feature_imp = pd.Series(classifier.feature_importances_,index=df.columns[:-1]).sort_values(ascending=False)
+print(feature_imp)
+
+sns.barplot(x=feature_imp, y=feature_imp.index)
+# Add labels in your graph
+plt.xlabel('Feature Importance Score')
+plt.ylabel('Features')
+plt.title("Visualizing Important Features")
+plt.figure(figsize=(100, 100))
+plt.show()
