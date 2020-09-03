@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import nil
 import pandas as pd
 import seaborn as sns
+import time
 
 from os import listdir
 from sklearn.model_selection import train_test_split
@@ -14,11 +15,24 @@ def forest_test(df):
     Y = df.iloc[:, -1]
     X = X.fillna(0)
     x_train, x_test, y_train, y_test = train_test_split(X, Y, test_size=0.30, random_state=51)
+    start = time.process_time()
     trained_forest = RandomForestClassifier(n_estimators=1000, n_jobs=-1).fit(x_train, y_train)
+    print("Time taken to train model : ", time.process_time() - start)
     prediction_forest = trained_forest.predict(x_test)
     print(confusion_matrix(y_test, prediction_forest))
     print(classification_report(y_test, prediction_forest))
-    return prediction_forest, trained_forest
+
+    feature_imp = pd.Series(trained_forest.feature_importances_, index=X.columns).sort_values(ascending=False)
+    print(feature_imp)
+
+    sns.barplot(x=feature_imp, y=feature_imp.index)
+    # Add labels in your graph
+    plt.xlabel('Feature Importance Score')
+    plt.ylabel('Features')
+    plt.title("Visualizing Important Features")
+    plt.figure(figsize=(100, 100))
+    plt.show()
+    return prediction_forest
 
 
 def read_data_from_directory(wafer_class, machine_step):
@@ -27,11 +41,13 @@ def read_data_from_directory(wafer_class, machine_step):
     dir_content = listdir("../Wafer_Data/" + wafer_class + "/" + machine_step + "/")
     dir_content.sort()
     cnt = 0
+    print("Start Reading Files")
     for file in dir_content:
         filepath = "../Wafer_Data/" + wafer_class + "/" + machine_step + "/" + file
-        print("Reading File {0}".format(file))
+        #         print("Reading File {0}".format(file))
         df = df.append(pd.read_csv(filepath))
 
+    print("Finished Reading Files")
     df = df.groupby(['WaferID', "STEP ID"]).describe(percentiles=[])
     wafer_class_bool = nil
     if 'good' in wafer_class:
@@ -156,44 +172,9 @@ def run_z3(threshold):
     df = pd.DataFrame(result_list, columns=['Type', 'Count'])
     print(df.groupby('Type').max())
 
-# 
-# if __name__ == "__main__":
-#     threshold = int(input("Enter the threshold: "))
-#     run_z1(threshold)
-#     run_z2(threshold)
-#     run_z3(threshold)
 
-threshold = int(input("Enter the threshold: "))
-# run_z1(threshold)
-# run_z2(threshold)
-# run_z3(threshold)
-
-# reading all Z1 Data
-good_z1_df = read_data_from_directory("good_wafer", "Z1_100")
-bad_z1_df = read_data_from_directory("bad_wafer", "Z1_100")
-
-# Creating combined dataset of both good and bad
-df = pd.DataFrame(good_z1_df.append(bad_z1_df), columns=good_z1_df.columns)
-
-# Remove Unnecessary Columns
-df = remove_columns(df)
-
-# Configuring the Heatmap to make it easier to see
-print_heatmap(df.corr())
-
-# Dividing into Inputs and Outputs and run Random Forest Classification
-result, classifier = forest_test(df)
-result_list = find_threshold(result, threshold)
-df_temp = pd.DataFrame(result_list, columns=['Type', 'Count'])
-print(df_temp.groupby('Type').max())
-
-feature_imp = pd.Series(classifier.feature_importances_,index=df.columns[:-1]).sort_values(ascending=False)
-print(feature_imp)
-
-sns.barplot(x=feature_imp, y=feature_imp.index)
-# Add labels in your graph
-plt.xlabel('Feature Importance Score')
-plt.ylabel('Features')
-plt.title("Visualizing Important Features")
-plt.figure(figsize=(100, 100))
-plt.show()
+if __name__ == "__main__":
+    threshold = int(input("Enter the threshold: "))
+    run_z1(threshold)
+    run_z2(threshold)
+    run_z3(threshold)
